@@ -35,14 +35,12 @@ import { StripeTerminal } from './plugin-registration'
 import { StripeTerminalWeb } from './web'
 
 export class StripeTerminalError extends Error {
-  /**
-   * For card errors resulting from a card issuer decline, a short string indicating the [card issuer’s reason for the decline](https://stripe.com/docs/declines#issuer-declines) if they provide one.
-   */
+  /** For card errors resulting from a card issuer decline, a short string
+   *   indicating the [card issuer’s reason for the decline](https://stripe.com/docs/declines#issuer-declines)
+   *   if they provide one. */
   decline_code?: string
 
-  /**
-   * The `PaymentIntent` object for errors returned on a request involving a `PaymentIntent`.
-   */
+  /** The `PaymentIntent` object for errors returned on a request involving a `PaymentIntent`. */
   payment_intent?: Stripe.PaymentIntent
 }
 

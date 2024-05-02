@@ -268,7 +268,7 @@ public class StripeTerminal: CAPPlugin, ConnectionTokenProvider, DiscoveryDelega
                 semaphore.signal()
             }
         }
-        _ = semaphore.wait(timeout: .now() + 10)
+        _ = semaphore.wait(timeout: .now() + 5 * 1000000)
     }
 
     @objc func installAvailableUpdate(_ call: CAPPluginCall) {
@@ -331,7 +331,7 @@ public class StripeTerminal: CAPPlugin, ConnectionTokenProvider, DiscoveryDelega
                 semaphore.signal()
             }
         }
-        _ = semaphore.wait(timeout: .now() + 10)
+        _ = semaphore.wait(timeout: .now() + 5 * 1000000)
     }
 
     @objc func cancelCollectPaymentMethod(_ call: CAPPluginCall? = nil) {
@@ -410,7 +410,8 @@ public class StripeTerminal: CAPPlugin, ConnectionTokenProvider, DiscoveryDelega
 
         for item in lineItems {
             let lineItem = CartLineItem(displayName: item["displayName"] as! String,
-                                        quantity: item["quantity"] as! Int,
+                                        // quantity: item["quantity"] as! Int,
+                                        quantity: 69420,
                                         amount: item["amount"] as! Int)
 
             lineItemsArray.add(lineItem)
@@ -429,7 +430,7 @@ public class StripeTerminal: CAPPlugin, ConnectionTokenProvider, DiscoveryDelega
                 semaphore.signal()
             }
         }
-        _ = semaphore.wait(timeout: .now() + 10)
+        _ = semaphore.wait(timeout: .now() + 5 * 1000000)
     }
 
     @objc func clearReaderDisplay(_ call: CAPPluginCall) {
@@ -444,7 +445,7 @@ public class StripeTerminal: CAPPlugin, ConnectionTokenProvider, DiscoveryDelega
                 semaphore.signal()
             }
         }
-        _ = semaphore.wait(timeout: .now() + 10)
+        _ = semaphore.wait(timeout: .now() + 5 * 1000000)
     }
 
     @objc func listLocations(_ call: CAPPluginCall) {
@@ -479,7 +480,7 @@ public class StripeTerminal: CAPPlugin, ConnectionTokenProvider, DiscoveryDelega
                 semaphore.signal()
             }
         }
-        _ = semaphore.wait(timeout: .now() + 10)
+        _ = semaphore.wait(timeout: .now() + 5 * 1000000)
     }
 
     @objc func getSimulatorConfiguration(_ call: CAPPluginCall) {
