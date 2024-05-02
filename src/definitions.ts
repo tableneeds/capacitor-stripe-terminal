@@ -1029,7 +1029,22 @@ export interface StripeTerminalInterface {
   ): Promise<PluginListenerHandle> & PluginListenerHandle
 
   addListener(
-    eventName: string,
+    eventName: TerminalEventName,
     listenerFunc: Function
   ): Promise<PluginListenerHandle> & PluginListenerHandle
 }
+
+export type TerminalEventName =
+  | 'didChangeConnectionStatus'
+  | 'didFailReaderReconnect'
+  | 'didFinishInstallingUpdate'
+  | 'didReportAvailableUpdate'
+  | 'didReportReaderSoftwareUpdateProgress'
+  | 'didReportUnexpectedReaderDisconnect'
+  | 'didRequestReaderDisplayMessage'
+  | 'didRequestReaderInput'
+  | 'didStartInstallingUpdate'
+  | 'didStartReaderReconnect'
+  | 'didSucceedReaderReconnect'
+  | 'readersDiscovered'
+  | 'requestConnectionToken'

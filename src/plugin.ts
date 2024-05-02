@@ -27,31 +27,31 @@ import {
   DeviceStyle,
   PermissionStatus,
   ReaderSoftwareUpdate,
-  CollectConfig
+  CollectConfig,
+  TerminalEventName
 } from './definitions'
 
 import { StripeTerminal } from './plugin-registration'
 import { StripeTerminalWeb } from './web'
 
 export class StripeTerminalError extends Error {
-  /**
-   * For card errors resulting from a card issuer decline, a short string indicating the [card issuer’s reason for the decline](https://stripe.com/docs/declines#issuer-declines) if they provide one.
-   */
+  /** For card errors resulting from a card issuer decline, a short string
+   *   indicating the [card issuer’s reason for the decline](https://stripe.com/docs/declines#issuer-declines)
+   *   if they provide one. */
   decline_code?: string
 
-  /**
-   * The `PaymentIntent` object for errors returned on a request involving a `PaymentIntent`.
-   */
+  /** The `PaymentIntent` object for errors returned on a request involving a `PaymentIntent`. */
   payment_intent?: Stripe.PaymentIntent
 }
 
 export class StripeTerminalPlugin {
   public isInitialized = false
 
-  private stripeTerminalWeb?: StripeTerminalWeb
+  private _stripeTerminalWeb?: StripeTerminalWeb
 
   private _fetchConnectionToken: () => Promise<string> = () =>
     Promise.reject('You must initialize StripeTerminalPlugin first.')
+
   private _onUnexpectedReaderDisconnect: () => void = () => {
     // reset the sdk type
     this.selectedSdkType = 'native'
@@ -70,7 +70,7 @@ export class StripeTerminalPlugin {
   private get activeSdkType(): 'native' | 'js' {
     if (
       this.selectedSdkType === 'js' &&
-      this.stripeTerminalWeb !== undefined &&
+      this._stripeTerminalWeb !== undefined &&
       this.isNative()
     ) {
       // only actually use the js sdk if its selected, initialized, and the app is running in a native environment
@@ -81,8 +81,8 @@ export class StripeTerminalPlugin {
   }
 
   private get sdk(): StripeTerminalInterface {
-    if (this.activeSdkType === 'js' && this.stripeTerminalWeb !== undefined) {
-      return this.stripeTerminalWeb
+    if (this.activeSdkType === 'js' && this._stripeTerminalWeb) {
+      return this._stripeTerminalWeb
     } else {
       return StripeTerminal
     }
@@ -107,7 +107,7 @@ export class StripeTerminalPlugin {
   }
 
   private requestConnectionToken(sdkType: string) {
-    const sdk = sdkType === 'native' ? StripeTerminal : this.stripeTerminalWeb
+    const sdk = sdkType === 'native' ? StripeTerminal : this._stripeTerminalWeb
 
     if (!sdk) {
       return
@@ -134,7 +134,7 @@ export class StripeTerminalPlugin {
   private async init() {
     if (this.isNative()) {
       // if on native android or ios, initialize the js sdk as well
-      this.stripeTerminalWeb = new StripeTerminalWeb()
+      this._stripeTerminalWeb = new StripeTerminalWeb()
     }
 
     this.listeners['connectionTokenListenerNative'] =
@@ -145,19 +145,18 @@ export class StripeTerminalPlugin {
     this.listeners['unexpectedReaderDisconnectListenerNative'] =
       await StripeTerminal.addListener(
         'didReportUnexpectedReaderDisconnect',
-        () => {
-          this._onUnexpectedReaderDisconnect()
-        }
+        () => void this._onUnexpectedReaderDisconnect()
       )
 
-    if (this.stripeTerminalWeb) {
+    if (this._stripeTerminalWeb) {
       this.listeners['connectionTokenListenerJs'] =
-        await this.stripeTerminalWeb.addListener('requestConnectionToken', () =>
-          this.requestConnectionToken('js')
+        await this._stripeTerminalWeb.addListener(
+          'requestConnectionToken',
+          () => this.requestConnectionToken('js')
         )
 
       this.listeners['unexpectedReaderDisconnectListenerJs'] =
-        await this.stripeTerminalWeb.addListener(
+        await this._stripeTerminalWeb.addListener(
           'didReportUnexpectedReaderDisconnect',
           () => {
             this._onUnexpectedReaderDisconnect()
@@ -167,7 +166,7 @@ export class StripeTerminalPlugin {
 
     await Promise.all([
       StripeTerminal.initialize(),
-      this.stripeTerminalWeb?.initialize()
+      this._stripeTerminalWeb?.initialize()
     ])
 
     this.isInitialized = true
@@ -260,8 +259,8 @@ export class StripeTerminalPlugin {
         listenerNative = l
       })
 
-      if (this.stripeTerminalWeb) {
-        this.stripeTerminalWeb
+      if (this._stripeTerminalWeb) {
+        this._stripeTerminalWeb
           .addListener(name, (data: any) => {
             // only send the event if the js sdk is in use
             if (this.activeSdkType === 'js') {
@@ -286,6 +285,7 @@ export class StripeTerminalPlugin {
     })
   }
 
+  /** Throw an error if the plugin is not initialized */
   private ensureInitialized() {
     if (!this.isInitialized) {
       throw new Error(
@@ -349,7 +349,7 @@ export class StripeTerminalPlugin {
 
       await Promise.all([
         StripeTerminal.cancelDiscoverReaders(),
-        this.stripeTerminalWeb?.cancelDiscoverReaders()
+        this._stripeTerminalWeb?.cancelDiscoverReaders()
       ])
 
       this.isDiscovering = false
@@ -423,6 +423,33 @@ export class StripeTerminalPlugin {
     return paymentIntent
   }
 
+  public discoveryEvents() {
+    // this.ensureInitialized()
+
+    return new Observable(subscriber => {
+      this.sdk.addListener('readersDiscovered', event => subscriber.next(event))
+    })
+  }
+
+  public beginDiscovery(options: DiscoveryConfiguration) {
+    this.ensureInitialized()
+
+    const nativeOptions: DiscoveryConfiguration = {
+      ...options,
+      discoveryMethod:
+        options.discoveryMethod === DiscoveryMethod.Both
+          ? DiscoveryMethod.BluetoothScan
+          : options.discoveryMethod
+    }
+
+    if (nativeOptions.discoveryMethod !== DiscoveryMethod.Internet) {
+      // remove locationId if the native discovery method is not internet
+      nativeOptions.locationId = undefined
+    }
+
+    this.sdk.discoverReaders(nativeOptions)
+  }
+
   public discoverReaders(
     options: DiscoveryConfiguration
   ): Observable<Reader[]> {
@@ -480,9 +507,9 @@ export class StripeTerminalPlugin {
       // if using the both method, search with the js sdk as well
       if (
         options.discoveryMethod === DiscoveryMethod.Both &&
-        this.stripeTerminalWeb
+        this._stripeTerminalWeb
       ) {
-        this.stripeTerminalWeb
+        this._stripeTerminalWeb
           .addListener('readersDiscovered', (event: { readers?: Reader[] }) => {
             const readers = event?.readers?.map(this.normalizeReader) || []
             jsReaderList = readers
@@ -500,7 +527,7 @@ export class StripeTerminalPlugin {
         }
 
         // TODO: figure out what to do with errors and completion on this method. maybe just ignore them?
-        this.stripeTerminalWeb.discoverReaders(jsOptions)
+        this._stripeTerminalWeb.discoverReaders(jsOptions)
       }
 
       return {
@@ -664,6 +691,7 @@ export class StripeTerminalPlugin {
     return await this.sdk.disconnectReader()
   }
 
+  /** Never Completes */
   public connectionStatus(): Observable<ConnectionStatus> {
     this.ensureInitialized()
 
@@ -697,7 +725,7 @@ export class StripeTerminalPlugin {
       })
 
       // then listen for js changes
-      this.stripeTerminalWeb
+      this._stripeTerminalWeb
         ?.addListener('didChangeConnectionStatus', (data: any) => {
           // only send an event if we are currently on this sdk type
           if (this.activeSdkType === 'js') {
@@ -1021,7 +1049,10 @@ export class StripeTerminalPlugin {
    *
    * @deprecated This should not be used directly. It will not behave correctly when using `Internet` and `Both` discovery methods
    */
-  public async addListener(eventName: string, listenerFunc: Function) {
+  public async addListener(
+    eventName: TerminalEventName,
+    listenerFunc: Function
+  ) {
     return await this.sdk.addListener(eventName, listenerFunc)
   }
 }
